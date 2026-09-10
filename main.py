@@ -1,7 +1,8 @@
 import logging
+from pathlib import Path
 
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
-from fastapi.responses import RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from pydantic import AnyHttpUrl, BaseModel
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
@@ -15,11 +16,17 @@ app = FastAPI()
 logger = logging.getLogger(__name__)
 
 MAX_SHORT_CODE_ATTEMPTS = 5
+STATIC_DIR = Path(__file__).parent / "static"
 
 
 @app.on_event("startup")
 async def on_startup() -> None:
     await init_db()
+
+
+@app.get("/")
+async def index() -> FileResponse:
+    return FileResponse(STATIC_DIR / "index.html")
 
 
 class ShortenRequest(BaseModel):

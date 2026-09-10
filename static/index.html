@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<title>Encurtador de URLs</title>
+<style>
+  body {
+    font-family: system-ui, sans-serif;
+    max-width: 480px;
+    margin: 80px auto;
+    padding: 0 16px;
+    color: #222;
+  }
+  h1 {
+    font-size: 1.4rem;
+    margin-bottom: 24px;
+  }
+  form {
+    display: flex;
+    gap: 8px;
+  }
+  input[type="text"] {
+    flex: 1;
+    padding: 10px 12px;
+    font-size: 1rem;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+  }
+  button {
+    padding: 10px 16px;
+    font-size: 1rem;
+    border: none;
+    border-radius: 6px;
+    background: #2563eb;
+    color: #fff;
+    cursor: pointer;
+  }
+  button:hover {
+    background: #1d4ed8;
+  }
+  #result {
+    margin-top: 24px;
+    padding: 12px;
+    border-radius: 6px;
+    background: #f3f4f6;
+    word-break: break-all;
+    display: none;
+  }
+  #result.error {
+    background: #fee2e2;
+    color: #991b1b;
+  }
+  #result a {
+    color: #2563eb;
+    font-weight: 600;
+  }
+  #copy-btn {
+    margin-left: 8px;
+    padding: 4px 10px;
+    font-size: 0.85rem;
+    background: #4b5563;
+  }
+</style>
+</head>
+<body>
+  <h1>Encurtador de URLs</h1>
+  <form id="shorten-form">
+    <input type="text" id="url-input" placeholder="https://exemplo.com/pagina/longa" required>
+    <button type="submit">Encurtar</button>
+  </form>
+  <div id="result"></div>
+
+  <script>
+    const form = document.getElementById("shorten-form");
+    const urlInput = document.getElementById("url-input");
+    const result = document.getElementById("result");
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      result.className = "";
+      result.style.display = "none";
+
+      try {
+        const response = await fetch("/shorten", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: urlInput.value }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.detail || "Erro ao encurtar a URL");
+        }
+
+        result.innerHTML =
+          `Link curto: <a href="${data.short_url}" target="_blank">${data.short_url}</a>` +
+          `<button id="copy-btn" type="button">Copiar</button>`;
+        result.style.display = "block";
+
+        document.getElementById("copy-btn").addEventListener("click", () => {
+          navigator.clipboard.writeText(data.short_url);
+        });
+      } catch (err) {
+        result.textContent = err.message;
+        result.className = "error";
+        result.style.display = "block";
+      }
+    });
+  </script>
+</body>
+</html>
