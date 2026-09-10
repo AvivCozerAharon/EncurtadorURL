@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
 from fastapi.responses import RedirectResponse
 from pydantic import AnyHttpUrl, BaseModel
@@ -9,6 +11,8 @@ from db import Link, SessionLocal, get_session, init_db
 from shortcode import generate_short_code
 
 app = FastAPI()
+
+logger = logging.getLogger(__name__)
 
 MAX_SHORT_CODE_ATTEMPTS = 5
 
@@ -57,11 +61,14 @@ async def shorten_url(
 
 
 async def _increment_hits(link_id: int) -> None:
-    async with SessionLocal() as session:
-        await session.execute(
-            update(Link).where(Link.id == link_id).values(hits=Link.hits + 1)
-        )
-        await session.commit()
+    try:
+        async with SessionLocal() as session:
+            await session.execute(
+                update(Link).where(Link.id == link_id).values(hits=Link.hits + 1)
+            )
+            await session.commit()
+    except SQLAlchemyError:
+        logger.warning("could not increment hits for link_id=%s", link_id)
 
 
 @app.get("/{short_code}")

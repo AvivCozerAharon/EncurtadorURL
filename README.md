@@ -11,6 +11,10 @@ docker compose up --build
 
 A API sobe em `http://localhost:8000`.
 
+Para rodar a aplicação localmente (fora do Docker) contra o Postgres do
+`docker compose`, copie `.env.example` para `.env` e exporte `DATABASE_URL`
+a partir dele antes de rodar `uvicorn main:app --reload`.
+
 ### Encurtar uma URL
 
 ```bash
@@ -23,7 +27,7 @@ Resposta:
 
 ```json
 {
-  "original_url": "https://google.com",
+  "original_url": "https://google.com/",
   "short_code": "aZ3kP9",
   "short_url": "http://localhost:8000/aZ3kP9"
 }
