@@ -1,34 +1,54 @@
-from fastapi import FastAPI, Request, Response, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi import Depends, FastAPI, HTTPException
+from pydantic import AnyHttpUrl, BaseModel
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from db import Link, get_session, init_db
+from shortcode import generate_short_code
 
 app = FastAPI()
 
-@app.post("/shorten")
-async def shorten_url(request: Request):
-    try:
-        data = await request.json()
-        original_url = data.get("url")
-        if not original_url:
-            raise HTTPException(status_code=400, detail="URL is required")
-        # i want to use postgresql to store the original_url and shortened_url
-        # Example placeholder logic - replace with actual PostgreSQL operations
-        shortened_url = f"http://short.url/{hash(original_url) % 1000000}"
+MAX_SHORT_CODE_ATTEMPTS = 5
 
-        return JSONResponse(content={"original_url": original_url, "shortened_url": shortened_url})
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/{shortened_path}")
-async def redirect_to_original(shortened_path: str):
-    try:
-        # Example placeholder logic - replace with actual PostgreSQL operations
-        # Here you would query your PostgreSQL database to find the original URL based on the shortened path
-        original_url = f"http://example.com/original/{shortened_path}"  # Placeholder for demonstration
+@app.on_event("startup")
+async def on_startup() -> None:
+    await init_db()
 
-        if not original_url:
-            raise HTTPException(status_code=404, detail="Shortened URL not found")
 
-        return JSONResponse(content={"original_url": original_url})
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+class ShortenRequest(BaseModel):
+    url: AnyHttpUrl
+
+
+class ShortenResponse(BaseModel):
+    original_url: str
+    short_code: str
+    short_url: str
+
+
+@app.post("/shorten", response_model=ShortenResponse)
+async def shorten_url(
+    payload: ShortenRequest, session: AsyncSession = Depends(get_session)
+) -> ShortenResponse:
+    original_url = str(payload.url)
+
+    for _ in range(MAX_SHORT_CODE_ATTEMPTS):
+        code = generate_short_code()
+        session.add(Link(original_url=original_url, short_code=code))
+        try:
+            await session.commit()
+        except IntegrityError:
+            await session.rollback()
+            continue
+        except SQLAlchemyError:
+            await session.rollback()
+            raise HTTPException(status_code=503, detail="Database unavailable")
+        return ShortenResponse(
+            original_url=original_url,
+            short_code=code,
+            short_url=f"http://localhost:8000/{code}",
+        )
+
+    raise HTTPException(
+        status_code=500, detail="Could not generate a unique short code"
+    )

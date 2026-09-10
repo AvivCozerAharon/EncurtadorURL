@@ -15,3 +15,16 @@ async def _reset_db():
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
     yield
+
+
+from httpx import ASGITransport, AsyncClient  # noqa: E402
+
+from main import app  # noqa: E402
+
+
+@pytest_asyncio.fixture
+async def client():
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
+        yield ac
